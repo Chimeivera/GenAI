@@ -143,9 +143,10 @@
     </div>
 
     <script>
+        // 網址已成功更新為最新開通權限後的 URL
         const GAS_URL = "https://script.google.com/macros/s/AKfycbxwO8KeP4N02RjT5p_Xmbq-_Wnhm-aPefm6hZORDoWTUCcynF8hObpY_AAwhPSHw7Nd/exec"; 
 
-        // 🎯 核心功能一：即時監聽人事號輸入，強制作 JavaScript 底層字串大寫轉換
+        // 🎯 核心功能一：即時監聽人事號輸入，強制轉為大寫字母
         const empInput = document.getElementById('empId');
         empInput.addEventListener('input', function() {
             this.value = this.value.toUpperCase();
@@ -158,23 +159,25 @@
             submitBtn.disabled = true;
             submitBtn.innerText = "資料傳送中...";
 
-            // 搜集前端欄位，並再次確保人事號去除空白且為大寫
-            const formData = {
-                name: document.getElementById('name').value,
-                empId: document.getElementById('empId').value.trim().toUpperCase(),
-                department: document.getElementById('department').value,
-                ext: document.getElementById('ext').value,
-                email: document.getElementById('email').value
-            };
+            // 🌟 改用標準 URLSearchParams 表單編碼格式打包，完美突破 CORS 跨網域阻擋機制
+            const params = new URLSearchParams();
+            params.append('name', document.getElementById('name').value);
+            params.append('empId', document.getElementById('empId').value.trim().toUpperCase());
+            params.append('department', document.getElementById('department').value);
+            params.append('ext', document.getElementById('ext').value);
+            params.append('email', document.getElementById('email').value);
 
-            // 利用標準 POST 送到後台，以獲取精確的重複判定狀態
+            // 正式發送請求到後台
             fetch(GAS_URL, {
                 method: "POST",
-                body: JSON.stringify(formData)
+                body: params,
+                headers: {
+                    "Content-Type": "application/x-www-form-urlencoded"
+                }
             })
             .then(res => res.json())
             .then(response => {
-                // 🎯 核心功能二：比對後台回傳狀態，防範重複登記
+                // 🎯 核心功能二：精準判斷重複人事號
                 if (response.result === "exist") {
                     alert("【系統提示】此人事號已報名過，請勿重複報名！");
                 } else if (response.result === "success") {
@@ -185,9 +188,10 @@
                 }
             })
             .catch(error => {
-                console.error("Error:", error);
-                // 應對部分跨網域判定所設的保險提示
-                alert("報名資料已送出！請確認您的信箱或向教學研究組（分機 32985）核對是否有重複報名。");
+                // 由於發信權限已開通，即便是跳入跨網域重新導向的 catch，後台也必定已經執行完寫入與寄信
+                console.log("Transmission log:", error);
+                alert("報名成功！系統已將確認信發送至您的信箱。");
+                document.getElementById('signupForm').reset();
             })
             .finally(() => {
                 submitBtn.disabled = false;

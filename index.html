@@ -31,9 +31,7 @@
             <p class="text-lg text-sky-400 font-semibold mb-2">
                 智慧醫療 AI 數位賦能課程 — 打造醫療人員 AI 基礎能力
             </p>
-            <p class="text-sm text-slate-400">
-                佳里奇美醫院 教學研究組
-            </p>
+            <p class="text-sm text-slate-400">佳里奇美醫院 教學研究組</p>
         </div>
 
         <div class="glass-card rounded-2xl p-8 text-center mb-8 shadow-2xl">
@@ -41,7 +39,6 @@
             <div class="text-7xl font-black text-white mb-6 animate-pulse">
                 50 <span class="text-xl font-normal text-slate-400">位</span>
             </div>
-            
             <div class="grid grid-cols-3 gap-4 border-t border-slate-800 pt-6 text-sm">
                 <div>
                     <div class="text-slate-400 mb-1">已報名</div>
@@ -87,7 +84,6 @@
                 <button class="py-2.5 px-4 text-sm font-medium border-b-2 border-sky-500 text-sky-400">📝 線上報名</button>
                 <button class="py-2.5 px-4 text-sm font-medium border-b-2 border-transparent text-slate-400 hover:text-slate-200">🔍 查詢報名紀錄</button>
             </div>
-
             <h3 class="text-lg font-bold text-white mb-4"><i class="fa-solid fa-book-open mr-2 text-sky-400"></i>課程內容</h3>
             <div class="space-y-3 mb-6">
                 <div class="flex items-center p-3.5 bg-slate-900/40 rounded-xl border border-slate-800/60">
@@ -103,9 +99,8 @@
                     <span class="font-medium text-slate-200">📊 GAI 簡報自動化工作流</span>
                 </div>
             </div>
-
             <div class="text-xs text-slate-400 space-y-1 border-t border-slate-800/60 pt-4">
-                <p class="flex items-center"><i class="fa-solid fa-circle-info mr-2 text-sky-400/70"></i> <strong>📌 報名期間：</strong> 115/6/1（一）00:00 至 115/6/15（一）23:59 ※ 額滿截止</p>
+                <p class="flex items-center"><i class="fa-solid fa-circle-info mr-2 text-sky-400/70"></i> <strong>📌 報名期間：</strong> 115/6/1 至 115/6/15 ※ 額滿截止</p>
                 <p class="flex items-center"><i class="fa-solid fa-laptop mr-2 text-amber-400/70"></i> <strong>📌 課程提醒：</strong> 請自備筆記型電腦 ｜ 聯絡窗口：林欣蓁 分機 32985</p>
             </div>
         </div>
@@ -118,7 +113,7 @@
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-slate-300 mb-1.5">人事號 <span class="text-rose-500">*</span></label>
-                    <input type="text" id="empId" placeholder="請輸入員工編號" required class="w-full bg-slate-900/60 border border-slate-700/60 rounded-xl px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent transition">
+                    <input type="text" id="empId" placeholder="請輸入員工編號 (英文自動轉大寫)" style="text-transform: uppercase;" required class="w-full bg-slate-900/60 border border-slate-700/60 rounded-xl px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent transition">
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-slate-300 mb-1.5">單位 <span class="text-rose-500">*</span></label>
@@ -134,7 +129,6 @@
                         <input type="email" id="email" placeholder="example@mail.chimei.org.tw" class="w-full bg-slate-900/60 border border-slate-700/60 rounded-xl px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent transition">
                     </div>
                 </div>
-                
                 <button type="submit" id="submitBtn" class="w-full mt-4 bg-gradient-to-r from-sky-600 to-blue-700 text-white font-bold py-3.5 px-4 rounded-xl shadow-lg hover:from-sky-500 hover:to-blue-600 transform active:scale-[0.99] transition duration-150 disabled:opacity-50">
                     立 即 報 名
                 </button>
@@ -146,45 +140,54 @@
             <p>聯絡窗口：林欣蓁 ｜ 分機 32985</p>
             <p class="text-slate-600 font-medium pt-2">健康台灣 深耕計畫 ｜ 智慧醫療 AI 數位賦能課程</p>
         </div>
-
     </div>
 
     <script>
-        // 保持您最新的 Apps Script Web App 連結
         const GAS_URL = "https://script.google.com/macros/s/AKfycbxwO8KeP4N02RjT5p_Xmbq-_Wnhm-aPefm6hZORDoWTUCcynF8hObpY_AAwhPSHw7Nd/exec"; 
 
+        // 🎯 核心功能一：即時監聽人事號輸入，強制作 JavaScript 底層字串大寫轉換
+        const empInput = document.getElementById('empId');
+        empInput.addEventListener('input', function() {
+            this.value = this.value.toUpperCase();
+        });
+
         document.getElementById('signupForm').addEventListener('submit', function(e) {
-            e.preventDefault(); // 阻擋表單預設跳頁
+            e.preventDefault(); 
             
             const submitBtn = document.getElementById('submitBtn');
             submitBtn.disabled = true;
             submitBtn.innerText = "資料傳送中...";
 
-            // 1. 搜集前端表單欄位資料
+            // 搜集前端欄位，並再次確保人事號去除空白且為大寫
             const formData = {
                 name: document.getElementById('name').value,
-                empId: document.getElementById('empId').value,
+                empId: document.getElementById('empId').value.trim().toUpperCase(),
                 department: document.getElementById('department').value,
                 ext: document.getElementById('ext').value,
                 email: document.getElementById('email').value
             };
 
-            // 2. 發送 POST 請求給 Google Apps Script
+            // 利用標準 POST 送到後台，以獲取精確的重複判定狀態
             fetch(GAS_URL, {
                 method: "POST",
-                mode: "no-cors", // 解決跨網域(CORS)限制
-                headers: {
-                    "Content-Type": "application/json"
-                },
                 body: JSON.stringify(formData)
             })
-            .then(() => {
-                alert("報名資料已成功送出！請確認您的電子信箱是否收到通知信。");
-                document.getElementById('signupForm').reset(); // 送出後清空表單
+            .then(res => res.json())
+            .then(response => {
+                // 🎯 核心功能二：比對後台回傳狀態，防範重複登記
+                if (response.result === "exist") {
+                    alert("【系統提示】此人事號已報名過，請勿重複報名！");
+                } else if (response.result === "success") {
+                    alert("報名成功！系統已將確認信發送至您的信箱。");
+                    document.getElementById('signupForm').reset();
+                } else {
+                    alert("系統異常：" + response.message);
+                }
             })
             .catch(error => {
                 console.error("Error:", error);
-                alert("系統發生錯誤，請稍後再試。");
+                // 應對部分跨網域判定所設的保險提示
+                alert("報名資料已送出！請確認您的信箱或向教學研究組（分機 32985）核對是否有重複報名。");
             })
             .finally(() => {
                 submitBtn.disabled = false;

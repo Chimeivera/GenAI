@@ -120,7 +120,8 @@
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-slate-300 mb-1.5">單位 <span class="text-rose-500">*</span></label>
-                    <input type="text" id="department" placeholder="所屬科室/單位" required class="w-full bg-slate-900/60 border border-slate-700/60 rounded-xl px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent transition">
+                    <input type="text" id="department" placeholder="請輸入單位全名（例：教學研究組、3A病房）" required class="w-full bg-slate-900/60 border border-slate-700/60 rounded-xl px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent transition">
+                    <p id="deptError" class="hidden mt-1.5 text-xs text-rose-400"><i class="fa-solid fa-circle-exclamation mr-1"></i>請輸入中文單位全名，勿填寫數字代碼</p>
                 </div>
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
@@ -208,13 +209,78 @@
         });
 
         /* ===========================================================
-           報名送出（沿用原本 POST 流程）
+           單位欄位：禁止輸入「四碼以上連續數字」
+           （單位名稱可含少量數字，如 3A病房、2AI；
+             但四碼數字多半是代碼/分機誤填，故攔下）
+        =========================================================== */
+        const deptInput = document.getElementById('department');
+        const deptError = document.getElementById('deptError');
+
+        // 是否含四碼（含）以上連續數字（半形或全形皆計）
+        function deptHasFourDigits(v) {
+            return /[0-9\uFF10-\uFF19]{4,}/.test(v || "");
+        }
+        // 完整驗證：不可空白、且不可含四碼連續數字
+        function isValidDept(v) {
+            var s = (v || "").trim();
+            return s !== "" && !deptHasFourDigits(s);
+        }
+
+        // 即時提示：一出現四碼連續數字就顯示
+        deptInput.addEventListener('input', function () {
+            if (deptHasFourDigits(this.value)) {
+                deptError.classList.remove('hidden');
+            } else {
+                deptError.classList.add('hidden');
+            }
+        });
+
+        /* ===========================================================
+           報名送出：送出前先檢查額滿/截止，送出後確實查證結果
         =========================================================== */
         document.getElementById('signupForm').addEventListener('submit', function (e) {
             e.preventDefault();
 
+            // 單位欄位驗證：禁止四碼連續數字（代碼/分機誤填）
+            if (!isValidDept(document.getElementById('department').value)) {
+                deptError.classList.remove('hidden');
+                alert("請輸入中文單位全名，勿填寫數字代碼");
+                document.getElementById('department').focus();
+                return;
+            }
+            deptError.classList.add('hidden');
+
             const submitBtn = document.getElementById('submitBtn');
             submitBtn.disabled = true;
+            submitBtn.innerText = "檢查名額中...";
+
+            // 送出前先用 JSONP 確認狀態（POST 讀不到回應，這層擋最準）
+            jsonpCount()
+                .then(stat => {
+                    if (stat && stat.closed) {
+                        alert("報名已截止，感謝您的關注！");
+                        resetSubmitBtn(submitBtn);
+                        return;
+                    }
+                    if (stat && stat.full) {
+                        alert("名額已額滿，報名截止！");
+                        resetSubmitBtn(submitBtn);
+                        loadStats();
+                        return;
+                    }
+                    doSubmit(submitBtn); // 通過檢查 → 正式送出
+                })
+                .catch(() => {
+                    doSubmit(submitBtn); // 狀態查詢失敗也讓他送，後端仍有最終把關
+                });
+        });
+
+        function resetSubmitBtn(btn) {
+            btn.disabled = false;
+            btn.innerText = "立 即 報 名";
+        }
+
+        function doSubmit(submitBtn) {
             submitBtn.innerText = "資料傳送中...";
 
             const params = new URLSearchParams();
@@ -233,25 +299,47 @@
             .then(response => {
                 if (response.result === "exist") {
                     alert("【系統提示】此人事號已報名過，請勿重複報名！");
+                } else if (response.result === "closed") {
+                    alert("報名已截止，感謝您的關注！");
+                } else if (response.result === "full") {
+                    alert("名額已額滿，報名截止！");
                 } else if (response.result === "success") {
                     alert("報名成功！系統已將確認信發送至您的信箱。");
                     document.getElementById('signupForm').reset();
-                    loadStats();
                 } else {
                     alert("系統異常：" + response.message);
                 }
-            })
-            .catch(error => {
-                console.log("Transmission log:", error);
-                alert("報名成功！系統已將確認信發送至您的信箱。");
-                document.getElementById('signupForm').reset();
                 loadStats();
             })
+            .catch(error => {
+                // POST 因 CORS 讀不到回應時，改用 JSONP 查證「是否真的寫進去」
+                console.log("Transmission log:", error);
+                const empVal = document.getElementById('empId').value.trim().toUpperCase();
+                jsonpQuery(empVal)
+                    .then(resp => {
+                        if (resp && resp.result === "found") {
+                            alert("報名成功！系統已將確認信發送至您的信箱。");
+                            document.getElementById('signupForm').reset();
+                        } else {
+                            // 沒寫進去 → 多半剛好額滿/截止，再查狀態給正確訊息
+                            jsonpCount()
+                                .then(stat => {
+                                    if (stat && stat.closed) alert("報名已截止，感謝您的關注！");
+                                    else if (stat && stat.full) alert("名額已額滿，報名截止！");
+                                    else alert("報名未完成，請稍後再試一次。");
+                                })
+                                .catch(() => alert("報名未完成，請稍後再試一次。"));
+                        }
+                    })
+                    .catch(() => {
+                        alert("送出後無法確認結果，請改用上方「查詢報名紀錄」確認是否成功。");
+                    })
+                    .finally(() => loadStats());
+            })
             .finally(() => {
-                submitBtn.disabled = false;
-                submitBtn.innerText = "立 即 報 名";
+                resetSubmitBtn(submitBtn);
             });
-        });
+        }
 
         /* ===========================================================
            查詢報名紀錄（用 JSONP，繞過 CORS）
@@ -394,6 +482,19 @@
                         document.getElementById('statRegistered').innerText = registered;
                         document.getElementById('statTotal').innerText = TOTAL_SEATS;
                         document.getElementById('statRate').innerText = rate;
+
+                        // 已額滿或已截止 → 鎖住報名鈕
+                        const submitBtn = document.getElementById('submitBtn');
+                        if (resp.closed) {
+                            submitBtn.disabled = true;
+                            submitBtn.innerText = "報 名 已 截 止";
+                        } else if (resp.full) {
+                            submitBtn.disabled = true;
+                            submitBtn.innerText = "名 額 已 額 滿";
+                        } else {
+                            submitBtn.disabled = false;
+                            submitBtn.innerText = "立 即 報 名";
+                        }
                     }
                 })
                 .catch(err => {

@@ -80,10 +80,6 @@
         </div>
 
         <div class="glass-card rounded-2xl p-6 mb-8">
-            <div class="flex border-b border-slate-800 mb-6">
-                <button class="py-2.5 px-4 text-sm font-medium border-b-2 border-sky-500 text-sky-400">📝 線上報名</button>
-                <button class="py-2.5 px-4 text-sm font-medium border-b-2 border-transparent text-slate-400 hover:text-slate-200">🔍 查詢報名紀錄</button>
-            </div>
             <h3 class="text-lg font-bold text-white mb-4"><i class="fa-solid fa-book-open mr-2 text-sky-400"></i>課程內容</h3>
             <div class="space-y-3 mb-6">
                 <div class="flex items-center p-3.5 bg-slate-900/40 rounded-xl border border-slate-800/60">
@@ -106,6 +102,13 @@
         </div>
 
         <div class="glass-card rounded-2xl p-8 mb-8 shadow-xl">
+            <!-- 分頁切換列 -->
+            <div class="flex border-b border-slate-800 mb-6">
+                <button id="tabSignup" type="button" class="py-2.5 px-4 text-sm font-medium border-b-2 border-sky-500 text-sky-400">📝 線上報名</button>
+                <button id="tabQuery" type="button" class="py-2.5 px-4 text-sm font-medium border-b-2 border-transparent text-slate-400 hover:text-slate-200">🔍 查詢報名紀錄</button>
+            </div>
+
+            <!-- ===== 報名面板 ===== -->
             <form id="signupForm" class="space-y-5">
                 <div>
                     <label class="block text-sm font-medium text-slate-300 mb-1.5">姓名 <span class="text-rose-500">*</span></label>
@@ -133,6 +136,20 @@
                     立 即 報 名
                 </button>
             </form>
+
+            <!-- ===== 查詢面板 ===== -->
+            <div id="queryPanel" class="space-y-5 hidden">
+                <div>
+                    <label class="block text-sm font-medium text-slate-300 mb-1.5">人事號 <span class="text-rose-500">*</span></label>
+                    <input type="text" id="queryEmpId" placeholder="請輸入您報名時的人事號" style="text-transform: uppercase;" class="w-full bg-slate-900/60 border border-slate-700/60 rounded-xl px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent transition">
+                </div>
+                <button type="button" id="queryBtn" class="w-full mt-1 bg-gradient-to-r from-sky-600 to-blue-700 text-white font-bold py-3.5 px-4 rounded-xl shadow-lg hover:from-sky-500 hover:to-blue-600 transform active:scale-[0.99] transition duration-150 disabled:opacity-50">
+                    查 詢 報 名 紀 錄
+                </button>
+
+                <!-- 查詢結果顯示區 -->
+                <div id="queryResult" class="hidden"></div>
+            </div>
         </div>
 
         <div class="text-center text-xs text-slate-500 space-y-1">
@@ -143,23 +160,60 @@
     </div>
 
     <script>
-        // 網址已成功更新為最新開通權限後的 URL
-        const GAS_URL = "https://script.google.com/macros/s/AKfycbxwO8KeP4N02RjT5p_Xmbq-_Wnhm-aPefm6hZORDoWTUCcynF8hObpY_AAwhPSHw7Nd/exec"; 
+        // ⚠️ 請填入你最新部署的 Apps Script 網址（與報名共用同一個 /exec 網址）
+        const GAS_URL = "https://script.google.com/macros/s/AKfycbxwO8KeP4N02RjT5p_Xmbq-_Wnhm-aPefm6hZORDoWTUCcynF8hObpY_AAwhPSHw7Nd/exec";
 
-        // 🎯 核心功能一：即時監聽人事號輸入，強制轉為大寫字母
-        const empInput = document.getElementById('empId');
-        empInput.addEventListener('input', function() {
+        /* ===========================================================
+           分頁切換邏輯
+        =========================================================== */
+        const tabSignup = document.getElementById('tabSignup');
+        const tabQuery  = document.getElementById('tabQuery');
+        const signupForm = document.getElementById('signupForm');
+        const queryPanel = document.getElementById('queryPanel');
+
+        const ACTIVE = ['border-sky-500', 'text-sky-400'];
+        const INACTIVE = ['border-transparent', 'text-slate-400', 'hover:text-slate-200'];
+
+        function activateTab(which) {
+            if (which === 'signup') {
+                tabSignup.classList.add(...ACTIVE);
+                tabSignup.classList.remove(...INACTIVE);
+                tabQuery.classList.add(...INACTIVE);
+                tabQuery.classList.remove(...ACTIVE);
+                signupForm.classList.remove('hidden');
+                queryPanel.classList.add('hidden');
+            } else {
+                tabQuery.classList.add(...ACTIVE);
+                tabQuery.classList.remove(...INACTIVE);
+                tabSignup.classList.add(...INACTIVE);
+                tabSignup.classList.remove(...ACTIVE);
+                queryPanel.classList.remove('hidden');
+                signupForm.classList.add('hidden');
+            }
+        }
+        tabSignup.addEventListener('click', () => activateTab('signup'));
+        tabQuery.addEventListener('click', () => activateTab('query'));
+
+        /* ===========================================================
+           人事號自動轉大寫（報名 + 查詢）
+        =========================================================== */
+        document.getElementById('empId').addEventListener('input', function () {
+            this.value = this.value.toUpperCase();
+        });
+        document.getElementById('queryEmpId').addEventListener('input', function () {
             this.value = this.value.toUpperCase();
         });
 
-        document.getElementById('signupForm').addEventListener('submit', function(e) {
-            e.preventDefault(); 
-            
+        /* ===========================================================
+           報名送出（沿用原本 POST 流程）
+        =========================================================== */
+        document.getElementById('signupForm').addEventListener('submit', function (e) {
+            e.preventDefault();
+
             const submitBtn = document.getElementById('submitBtn');
             submitBtn.disabled = true;
             submitBtn.innerText = "資料傳送中...";
 
-            // 🌟 改用標準 URLSearchParams 表單編碼格式打包，完美突破 CORS 跨網域阻擋機制
             const params = new URLSearchParams();
             params.append('name', document.getElementById('name').value);
             params.append('empId', document.getElementById('empId').value.trim().toUpperCase());
@@ -167,17 +221,13 @@
             params.append('ext', document.getElementById('ext').value);
             params.append('email', document.getElementById('email').value);
 
-            // 正式發送請求到後台
             fetch(GAS_URL, {
                 method: "POST",
                 body: params,
-                headers: {
-                    "Content-Type": "application/x-www-form-urlencoded"
-                }
+                headers: { "Content-Type": "application/x-www-form-urlencoded" }
             })
             .then(res => res.json())
             .then(response => {
-                // 🎯 核心功能二：精準判斷重複人事號
                 if (response.result === "exist") {
                     alert("【系統提示】此人事號已報名過，請勿重複報名！");
                 } else if (response.result === "success") {
@@ -188,7 +238,6 @@
                 }
             })
             .catch(error => {
-                // 由於發信權限已開通，即便是跳入跨網域重新導向的 catch，後台也必定已經執行完寫入與寄信
                 console.log("Transmission log:", error);
                 alert("報名成功！系統已將確認信發送至您的信箱。");
                 document.getElementById('signupForm').reset();
@@ -197,6 +246,110 @@
                 submitBtn.disabled = false;
                 submitBtn.innerText = "立 即 報 名";
             });
+        });
+
+        /* ===========================================================
+           查詢報名紀錄（用 JSONP，繞過 CORS）
+        =========================================================== */
+        function jsonpQuery(empId) {
+            return new Promise((resolve, reject) => {
+                const cbName = 'gasCb_' + Date.now() + '_' + Math.floor(Math.random() * 10000);
+                let timer = null;
+
+                function cleanup() {
+                    if (timer) clearTimeout(timer);
+                    delete window[cbName];
+                    if (script.parentNode) script.parentNode.removeChild(script);
+                }
+
+                window[cbName] = function (data) {
+                    cleanup();
+                    resolve(data);
+                };
+
+                const script = document.createElement('script');
+                script.src = GAS_URL
+                    + '?action=query'
+                    + '&empId=' + encodeURIComponent(empId)
+                    + '&callback=' + cbName;
+                script.onerror = function () {
+                    cleanup();
+                    reject(new Error('查詢連線失敗，請確認網路或稍後再試。'));
+                };
+                document.body.appendChild(script);
+
+                // 10 秒逾時保護
+                timer = setTimeout(function () {
+                    cleanup();
+                    reject(new Error('查詢逾時，請稍後再試。'));
+                }, 10000);
+            });
+        }
+
+        const queryBtn = document.getElementById('queryBtn');
+        const queryResult = document.getElementById('queryResult');
+
+        function renderFound(d) {
+            queryResult.className = "rounded-xl border border-emerald-500/40 bg-emerald-500/5 p-5";
+            queryResult.innerHTML = `
+                <div class="flex items-center mb-4 text-emerald-400 font-bold">
+                    <i class="fa-solid fa-circle-check mr-2"></i> 已找到您的報名紀錄
+                </div>
+                <table class="w-full text-sm">
+                    <tbody>
+                        <tr><td class="py-1.5 text-slate-400 w-24">姓名</td><td class="py-1.5 text-white font-medium">${d.name || '-'}</td></tr>
+                        <tr><td class="py-1.5 text-slate-400">人事號</td><td class="py-1.5 text-white font-mono font-bold">${d.empId || '-'}</td></tr>
+                        <tr><td class="py-1.5 text-slate-400">單位</td><td class="py-1.5 text-white">${d.department || '-'}</td></tr>
+                        <tr><td class="py-1.5 text-slate-400">分機</td><td class="py-1.5 text-white">${d.ext || '未填寫'}</td></tr>
+                        <tr><td class="py-1.5 text-slate-400">電子信箱</td><td class="py-1.5 text-white break-all">${d.email || '未填寫'}</td></tr>
+                        <tr><td class="py-1.5 text-slate-400">報名時間</td><td class="py-1.5 text-white">${d.timestamp || '-'}</td></tr>
+                    </tbody>
+                </table>`;
+            queryResult.classList.remove('hidden');
+        }
+
+        function renderNotFound() {
+            queryResult.className = "rounded-xl border border-amber-500/40 bg-amber-500/5 p-5 text-center";
+            queryResult.innerHTML = `
+                <div class="text-amber-400 font-bold mb-1"><i class="fa-solid fa-circle-exclamation mr-2"></i> 查無報名紀錄</div>
+                <p class="text-sm text-slate-400">此人事號尚未報名，請確認輸入是否正確，或切換至「線上報名」分頁完成報名。</p>`;
+            queryResult.classList.remove('hidden');
+        }
+
+        function renderError(msg) {
+            queryResult.className = "rounded-xl border border-rose-500/40 bg-rose-500/5 p-5 text-center";
+            queryResult.innerHTML = `<div class="text-rose-400 font-bold"><i class="fa-solid fa-triangle-exclamation mr-2"></i> ${msg}</div>`;
+            queryResult.classList.remove('hidden');
+        }
+
+        queryBtn.addEventListener('click', function () {
+            const empId = document.getElementById('queryEmpId').value.trim().toUpperCase();
+            if (empId === "") {
+                alert("請先輸入人事號！");
+                return;
+            }
+
+            queryBtn.disabled = true;
+            queryBtn.innerText = "查詢中...";
+            queryResult.classList.add('hidden');
+
+            jsonpQuery(empId)
+                .then(resp => {
+                    if (resp.result === "found") {
+                        renderFound(resp.data);
+                    } else if (resp.result === "notfound") {
+                        renderNotFound();
+                    } else {
+                        renderError("系統異常：" + (resp.message || '未知錯誤'));
+                    }
+                })
+                .catch(err => {
+                    renderError(err.message);
+                })
+                .finally(() => {
+                    queryBtn.disabled = false;
+                    queryBtn.innerText = "查 詢 報 名 紀 錄";
+                });
         });
     </script>
 </body>

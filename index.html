@@ -37,20 +37,20 @@
         <div class="glass-card rounded-2xl p-8 text-center mb-8 shadow-2xl">
             <h2 class="text-xl font-bold tracking-widest text-slate-300 mb-4">剩 餘 名 額</h2>
             <div class="text-7xl font-black text-white mb-6 animate-pulse">
-                50 <span class="text-xl font-normal text-slate-400">位</span>
+                <span id="statRemaining">50</span> <span class="text-xl font-normal text-slate-400">位</span>
             </div>
             <div class="grid grid-cols-3 gap-4 border-t border-slate-800 pt-6 text-sm">
                 <div>
                     <div class="text-slate-400 mb-1">已報名</div>
-                    <div class="text-lg font-bold text-emerald-400">0 <span class="text-xs font-normal text-slate-500">位</span></div>
+                    <div class="text-lg font-bold text-emerald-400"><span id="statRegistered">0</span> <span class="text-xs font-normal text-slate-500">位</span></div>
                 </div>
                 <div>
                     <div class="text-slate-400 mb-1">總名額</div>
-                    <div class="text-lg font-bold text-white">50 <span class="text-xs font-normal text-slate-500">位</span></div>
+                    <div class="text-lg font-bold text-white"><span id="statTotal">50</span> <span class="text-xs font-normal text-slate-500">位</span></div>
                 </div>
                 <div>
                     <div class="text-slate-400 mb-1">填滿率</div>
-                    <div class="text-lg font-bold text-sky-400">0 %</div>
+                    <div class="text-lg font-bold text-sky-400"><span id="statRate">0</span> %</div>
                 </div>
             </div>
         </div>
@@ -161,7 +161,10 @@
 
     <script>
         // ⚠️ 請填入你最新部署的 Apps Script 網址（與報名共用同一個 /exec 網址）
-        const GAS_URL = "https://script.google.com/macros/s/AKfycbxAFw6zjuGgclZ77Tdw3QyV3M5LpQsE0XhHhy2LJCWX8GTP2oa7QdZAgbB7zL11h0tb/exec";
+        const GAS_URL = "https://script.google.com/macros/s/AKfycbwBEY5m3WUE-sW4FZ24DoBIgC9E4nxyQfUXDTDYXIbUEIABJqbuD5upykYFhtObNY9V/exec";
+
+        // 總名額（要改名額就改這一個數字）
+        const TOTAL_SEATS = 50;
 
         /* ===========================================================
            分頁切換邏輯
@@ -233,6 +236,7 @@
                 } else if (response.result === "success") {
                     alert("報名成功！系統已將確認信發送至您的信箱。");
                     document.getElementById('signupForm').reset();
+                    loadStats();
                 } else {
                     alert("系統異常：" + response.message);
                 }
@@ -241,6 +245,7 @@
                 console.log("Transmission log:", error);
                 alert("報名成功！系統已將確認信發送至您的信箱。");
                 document.getElementById('signupForm').reset();
+                loadStats();
             })
             .finally(() => {
                 submitBtn.disabled = false;
@@ -351,6 +356,53 @@
                     queryBtn.innerText = "查 詢 報 名 紀 錄";
                 });
         });
+
+        /* ===========================================================
+           即時名額看板：抓報名人數 → 重算 已報名/剩餘/填滿率
+        =========================================================== */
+        function jsonpCount() {
+            return new Promise((resolve, reject) => {
+                const cbName = 'gasCnt_' + Date.now() + '_' + Math.floor(Math.random() * 10000);
+                let timer = null;
+
+                function cleanup() {
+                    if (timer) clearTimeout(timer);
+                    delete window[cbName];
+                    if (script.parentNode) script.parentNode.removeChild(script);
+                }
+
+                window[cbName] = function (data) { cleanup(); resolve(data); };
+
+                const script = document.createElement('script');
+                script.src = GAS_URL + '?action=count&callback=' + cbName;
+                script.onerror = function () { cleanup(); reject(new Error('count failed')); };
+                document.body.appendChild(script);
+
+                timer = setTimeout(function () { cleanup(); reject(new Error('count timeout')); }, 10000);
+            });
+        }
+
+        function loadStats() {
+            jsonpCount()
+                .then(resp => {
+                    if (resp && resp.result === "count") {
+                        const registered = Number(resp.registered) || 0;
+                        const remaining = Math.max(TOTAL_SEATS - registered, 0);
+                        const rate = TOTAL_SEATS > 0 ? Math.round((registered / TOTAL_SEATS) * 100) : 0;
+
+                        document.getElementById('statRemaining').innerText = remaining;
+                        document.getElementById('statRegistered').innerText = registered;
+                        document.getElementById('statTotal').innerText = TOTAL_SEATS;
+                        document.getElementById('statRate').innerText = rate;
+                    }
+                })
+                .catch(err => {
+                    console.log("名額統計載入失敗：", err);
+                });
+        }
+
+        // 頁面載入時先抓一次最新名額
+        loadStats();
     </script>
 </body>
 </html>
